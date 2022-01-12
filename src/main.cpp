@@ -37,6 +37,9 @@ float WheelDiameter = 31.0;
 float Speed = 0;
 float Distance = 0;
 
+
+bool temp_dir = 1;
+
 // PID pid(&ActualSpeed, &Output, &targetSpeed, Kp, Ki, Kd, DIRECT);
 // PID myPID(&ActualSpeed, &Output, &TargetSpeed, Kp, Ki, Kd, DIRECT);
 Servo servo;
@@ -198,8 +201,9 @@ void loop() {
   //
 
   // Serial.println(Input);
-  analogWrite(motorOutputPin, abs(Input));
-  digitalWrite(motorDirectionPin, Input >= 0);
+  analogWrite(motorOutputPin, 128);
+  digitalWrite(motorDirectionPin, temp_dir);
+  temp_dir = !temp_dir;
 
   StaticJsonDocument<128> status;
   status["Distance"] = Distance;
@@ -209,5 +213,5 @@ void loop() {
   serializeJson(status, statusSerialized);
   mqttClient.publish(mqttStatusTopic, statusSerialized);
 
-  delay(10);
+  delay(2000);
 }
