@@ -1,150 +1,76 @@
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
-#include <PID_v1.h>
 #include <PubSubClient.h>
 #include <Servo.h>
 #include <config.h>
-#include <math.h>
 
-#define motorOutputPin D1
-#define motorDirectionPin D3
+// controll pins
+#define MOTOR_OUTPUT_PIN D1
+#define MOTOR_DIRECTION_PIN D3
+#define SERVO_PIN D5
+#define BATTERY_CONTROLL_PIN D4
 
+// input pins
 #define TACHO_PIN D7
-#define servoPin D5
-#define batteryControllPin D4
 
-const float motorRatio = (1.0 / 60.0) / 3.0;
-const float wheelDiameter = 36.0; // unit in mm
-const float differentialRatio = 1.0 / 1.4;
+// constants
+#define MOTOR_RATIO 1 / 48
+#define WHEEL_DIAMETER 36.0 // unit in mm
+#define DIFFERENTIAL_RATIO 1.0 / 1.4
 
-double Kp = 1, Ki = 1, Kd = 1;
+StaticJsonDocument<1024> doc;
+unsigned long int LastPulse[3];
+unsigned long int LastMeasure;
 
-bool Direction;
-int8 servoOffset = 0;
-double Output;
-double Input;
-StaticJsonDocument<512> doc;
+long int Rotations = 0;
 
-uint32 LastMeasures[3] = {0, 0, 0};
-uint64 MicrosAtLast = 0;
-uint64 TimeAtLastRotation = 0;
+bool tempDir;
 
-int8 Dir;
-
-float MotorRatio = 1.0 / 60.0;
-float DiffRatio = 1.0 / 1.40;
-float WheelDiameter = 31.0;
-float Speed = 0;
-float Distance = 0;
-
-
-bool temp_dir = 1;
-
-// PID pid(&ActualSpeed, &Output, &targetSpeed, Kp, Ki, Kd, DIRECT);
-// PID myPID(&ActualSpeed, &Output, &TargetSpeed, Kp, Ki, Kd, DIRECT);
 Servo servo;
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
-void IRAM_ATTR interrupt() {
+void IRAM_ATTR pulseCallback() {
 
-  if ((micros() - LastMeasures[0]) < 200) {
-    return;
+  LastPulse[2] = LastPulse[1];
+  LastPulse[1] = LastPulse[0];
+  LastPulse[0] = micros() - LastMeasure;
+
+  LastMeasure = micros();
+
+  int tempDir = 0;
+  tempDir += (LastPulse[0] < LastPulse[1]);
+  tempDir += (LastPulse[1] < LastPulse[2]);
+
+  if (tempDir - 1) {
+    Rotations += tempDir - 1;
+    Serial.printf("rot: %li, dir: %i\n", Rotations, tempDir - 1);
   }
 
-  LastMeasures[2] = LastMeasures[1];
-  LastMeasures[1] = LastMeasures[0];
-
-  LastMeasures[0] = micros() - MicrosAtLast;
-
-  int dirSum = 0;
-
-  dirSum += LastMeasures[0] > LastMeasures[1];
-  dirSum += LastMeasures[1] > LastMeasures[2];
-  dirSum += LastMeasures[2] > LastMeasures[0];
-  MicrosAtLast = micros();
-
-  int tempDir;
-
-  Serial.println(dirSum - 1);
-
-  //if (dirSum - 1) {
-  //  Dir = dirSum - 1;
-  //  Speed = ((float)(micros() - TimeAtLastRotation) / 1.0);
-  //  Distance += Speed;
-
-  //  Serial.printf("%8i, %8i, %10i, %8i, %8lli, %8.1f, %f\n", LastMeasures[0],
-  //                LastMeasures[1], LastMeasures[2], dirSum - 1,
-  //                micros() - TimeAtLastRotation, Speed, Distance);
-  //  TimeAtLastRotation = micros();
-  //}
+  // Serial.printf("val: %8i, arr: [ %8li, %8li, %8li ]\n", tempDir,
+  // LastPulse[0], LastPulse[1], LastPulse[2]);
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
-  long unsigned int startTime = micros();
-
-  // Serial.println((char *)payload);
   deserializeJson(doc, payload);
-  // serializeJsonPretty(doc, Serial);
-
-  JsonVariant servoData = doc["Servo"];
-  if (!servoData.isNull()) {
-    servoOffset = servoData["servoOffset"];
-    servoOffset = servoOffset * -1;
-  }
-
-  JsonVariant pidData = doc["PID"];
-  if (!pidData.isNull()) {
-    Kp = pidData["p"];
-    Ki = pidData["i"];
-    Kd = pidData["d"];
-  }
-
-  JsonVariant driveData = doc["drive"];
-  if (!driveData.isNull()) {
-    uint16 forward = doc["Forward"];
-    uint16 backward = doc["Backward"];
-    uint8 turning = int(doc["Turning"]) + 90;
-
-    Input = forward - backward;
-    Direction = (Input < 0 ? LOW : HIGH);
-
-    Serial.println(Input);
-    // Serial.println(turning);
-
-    servo.write(turning + servoOffset);
-    // Serial.println(micros() - startTime);
-  }
 }
 
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(motorDirectionPin, OUTPUT);
-  pinMode(motorOutputPin, OUTPUT);
-  pinMode(batteryControllPin, OUTPUT);
-  pinMode(TACHO_PIN, INPUT);
-
-  // myPID.SetMode(AUTOMATIC);
-
-  attachInterrupt(digitalPinToInterrupt(TACHO_PIN), interrupt, RISING);
-
-  digitalWrite(batteryControllPin, 0);
-
-  delay(2000);
-
-  digitalWrite(batteryControllPin, 1);
-
   Serial.begin(921600);
 
-  servo.attach(D5);
+  pinMode(MOTOR_OUTPUT_PIN, OUTPUT);
+  pinMode(MOTOR_DIRECTION_PIN, OUTPUT);
+  pinMode(BATTERY_CONTROLL_PIN, OUTPUT);
+
+  attachInterrupt(digitalPinToInterrupt(TACHO_PIN), pulseCallback, FALLING);
+
+  servo.attach(SERVO_PIN);
 
   WiFi.begin(ssid, password);
 
   int tries = 1;
-
   while (WiFi.status() != WL_CONNECTED) {
-
     Serial.println(ssid);
     Serial.println(password);
     Serial.println();
@@ -161,6 +87,8 @@ void setup() {
     digitalWrite(LED_BUILTIN, LOW);
     delay(500);
   }
+
+  digitalWrite(BATTERY_CONTROLL_PIN, true);
 
   mqttClient.setServer(mqttServer, mqttPort);
   mqttClient.setCallback(callback);
@@ -187,31 +115,12 @@ void setup() {
 void loop() {
   mqttClient.loop();
 
-  // ActualSpeed =
-  //    (Count / 0.100) * motorRatio * differentialRatio * wheelDiameter
-  //    * 3.141;
-  // Count = 0;
+  tempDir = !tempDir;
 
-  // if (myPID.Compute()) {
-  //  Serial.println("PID updated");
-  //} else {
-  //  Serial.println("PID LOOP FAILED");
-  //  mqttClient.publish(mqttPubTopic, "PID LOOP FAILED");
-  //}
-  //
+  analogWrite(MOTOR_OUTPUT_PIN, 256);
+  digitalWrite(MOTOR_DIRECTION_PIN, tempDir);
+  Serial.println((double)Rotations * WHEEL_DIAMETER * 3.141 *
+                 DIFFERENTIAL_RATIO * MOTOR_RATIO);
 
-  // Serial.println(Input);
-  analogWrite(motorOutputPin, 128);
-  digitalWrite(motorDirectionPin, temp_dir);
-  temp_dir = !temp_dir;
-
-  StaticJsonDocument<128> status;
-  status["Distance"] = Distance;
-  status["Speed"] = Speed;
-
-  char statusSerialized[128];
-  serializeJson(status, statusSerialized);
-  mqttClient.publish(mqttStatusTopic, statusSerialized);
-
-  delay(2000);
+  delay(1000);
 }
