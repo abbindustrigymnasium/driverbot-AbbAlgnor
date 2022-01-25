@@ -8,7 +8,7 @@ function onConnect() {
     let topic = document.forms["connectionForm"]["topic"].value
     console.log("onConnect");
     log("Connected!", "LogTopic")
-    client.subscribe("LogTopic");
+    client.subscribe("DriverBotLogTopic");
     client.subscribe("DriverBotStatus");
     message = new Paho.MQTT.Message("Hello from web");
     message.destinationName = topic;
@@ -28,8 +28,9 @@ function onConnectionLost(responseObject) {
 
 // called when a message arrives
 function onMessageArrived(message) {
-    if (message.destinationName == "LogTopic") {
-    log("<span class='topic'>" + message.destinationName + "</span>: " + message.payloadString, message.destinationName, type)
+  console.log(message.destinationName)
+    if (message.destinationName == "DriverBotLogTopic") {
+    log("<span class='topic'>" + message.destinationName + "</span>: " + message.payloadString, message.destinationName)
     }
     else if (message.destinationName == "DriverBotStatus") {
        document.getElementById("DriverBotStatus").innerHTML = syntaxHighlight(JSON.stringify(message.payloadString, undefined, 2)) 

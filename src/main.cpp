@@ -28,7 +28,7 @@ unsigned long int LastTick;
 
 long int P, I, D;
 
-int Turning;
+int Turning, ServoOffset;
 int TargetSpeed;
 
 long int Rotations = 0;
@@ -65,19 +65,23 @@ void IRAM_ATTR pulseCallback() {
 void callback(char *topic, byte *payload, unsigned int length) {
   Serial.println("mqtt recieved");
   deserializeJson(doc, payload);
-  deserializeJson(doc, Serial);
-  // if(doc["pid"]) {
-  //  P = doc["pid"]["p"];
-  //  I = doc["pid"]["i"];
-  //  D = doc["pid"]["d"];
-  //}
-  // if(doc["drive"]) {
-  //  int Forward = doc["drive"]["Forward"];
-  //  int Backward = doc["drive"]["Backward"];
-  //  Turning = doc["drive"]["Turning"];
-  //  TargetSpeed = Forward - Backward;
-  //  Serial.println("updated target speed");
-  //}
+  serializeJsonPretty(doc, Serial);
+   if(doc["pid"]) {
+    P = doc["pid"]["p"];
+    I = doc["pid"]["i"];
+    D = doc["pid"]["d"];
+  }
+   if(doc["Servo"]) {
+     ServoOffset = doc["Servo"]["servoOffset"];
+   }
+
+   if(doc["drive"]) {
+    int Forward = doc["drive"]["Forward"];
+    int Backward = doc["drive"]["Backward"];
+    Turning = doc["drive"]["Turning"];
+    TargetSpeed = Forward - Backward;
+    Serial.println("updated target speed");
+  }
 }
 
 void setup() {
@@ -142,19 +146,21 @@ void loop() {
   if ((millis() - LastTick) > 100) {
     LastTick = millis();
 
-        Distance = ((double)Rotations * WHEEL_DIAMETER * 3.141 *
-                    DIFFERENTIAL_RATIO * MOTOR_RATIO);
+    Distance = ((double)Rotations * WHEEL_DIAMETER * 3.141 *
+                DIFFERENTIAL_RATIO * MOTOR_RATIO) * -1;
 
     if ((millis() - LastStatusUpdate) > 500) {
+      LastStatusUpdate = millis();
+
       post["Distance"] = Distance;
       char buffer[256];
       serializeJson(post, buffer);
       mqttClient.publish(mqttStatusTopic, buffer);
-      LastStatusUpdate = millis();
     }
 
     digitalWrite(MOTOR_DIRECTION_PIN, 0 > TargetSpeed);
     analogWrite(MOTOR_OUTPUT_PIN, abs(TargetSpeed));
+    servo.write(Turning + 90 + ServoOffset);
 
     Serial.println(Distance);
     Serial.println(TargetSpeed);

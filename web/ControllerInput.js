@@ -36,9 +36,9 @@ function loop() {
     var gp = gamepads[0];
 
     let message = {
-        Forward: Math.round((gp.axes[5] / 2 + 0.5) * 1024),
-        Backward: Math.round((gp.axes[2] / 2 + 0.5) * 1024),
-        Turning: Math.round(gp.axes[0] * -90)
+        Forward: Math.round((gp.axes[5] / 2 + 0.5) * document.getElementById("speed").value),
+        Backward: Math.round((gp.axes[2] / 2 + 0.5) * document.getElementById("speed").value),
+        Turning: Math.round(gp.axes[0] * -70)
     }
 
     if (Date.now() >= (lastSend + 50)) {
