@@ -19,10 +19,21 @@
 #define DIFFERENTIAL_RATIO 1.0 / 1.4
 
 StaticJsonDocument<1024> doc;
+StaticJsonDocument<1024> post;
+
 unsigned long int LastPulse[3];
 unsigned long int LastMeasure;
+unsigned long int LastStatusUpdate;
+unsigned long int LastTick;
+
+long int P, I, D;
+
+int Turning;
+int TargetSpeed;
 
 long int Rotations = 0;
+
+double Distance = 0;
 
 bool tempDir;
 
@@ -45,7 +56,6 @@ void IRAM_ATTR pulseCallback() {
 
   if (tempDir - 1) {
     Rotations += tempDir - 1;
-    Serial.printf("rot: %li, dir: %i\n", Rotations, tempDir - 1);
   }
 
   // Serial.printf("val: %8i, arr: [ %8li, %8li, %8li ]\n", tempDir,
@@ -53,7 +63,21 @@ void IRAM_ATTR pulseCallback() {
 }
 
 void callback(char *topic, byte *payload, unsigned int length) {
+  Serial.println("mqtt recieved");
   deserializeJson(doc, payload);
+  deserializeJson(doc, Serial);
+  // if(doc["pid"]) {
+  //  P = doc["pid"]["p"];
+  //  I = doc["pid"]["i"];
+  //  D = doc["pid"]["d"];
+  //}
+  // if(doc["drive"]) {
+  //  int Forward = doc["drive"]["Forward"];
+  //  int Backward = doc["drive"]["Backward"];
+  //  Turning = doc["drive"]["Turning"];
+  //  TargetSpeed = Forward - Backward;
+  //  Serial.println("updated target speed");
+  //}
 }
 
 void setup() {
@@ -115,12 +139,24 @@ void setup() {
 void loop() {
   mqttClient.loop();
 
-  tempDir = !tempDir;
+  if ((millis() - LastTick) > 100) {
+    LastTick = millis();
 
-  analogWrite(MOTOR_OUTPUT_PIN, 256);
-  digitalWrite(MOTOR_DIRECTION_PIN, tempDir);
-  Serial.println((double)Rotations * WHEEL_DIAMETER * 3.141 *
-                 DIFFERENTIAL_RATIO * MOTOR_RATIO);
+        Distance = ((double)Rotations * WHEEL_DIAMETER * 3.141 *
+                    DIFFERENTIAL_RATIO * MOTOR_RATIO);
 
-  delay(1000);
+    if ((millis() - LastStatusUpdate) > 500) {
+      post["Distance"] = Distance;
+      char buffer[256];
+      serializeJson(post, buffer);
+      mqttClient.publish(mqttStatusTopic, buffer);
+      LastStatusUpdate = millis();
+    }
+
+    digitalWrite(MOTOR_DIRECTION_PIN, 0 > TargetSpeed);
+    analogWrite(MOTOR_OUTPUT_PIN, abs(TargetSpeed));
+
+    Serial.println(Distance);
+    Serial.println(TargetSpeed);
+  }
 }

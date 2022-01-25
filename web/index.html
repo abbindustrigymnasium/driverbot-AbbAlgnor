@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="style.css">
+    <title>Document</title>
+</head>
+
+<body>
+    <button onmousedown="send()">test</button>
+    <div class="collapseArea">
+        <button type="button" class="collapsible" action="">Connect</button>
+        <div class="content">
+            <form name="connectionForm" onsubmit="connect(); return false">
+                <label>IP</label>
+                <input name="ip" type="text">
+                <label>port</label>
+                <input name="port" type="text">
+                <label>topic</label>
+                <input name="topic" type="text">
+                <input type="submit" value="Connect">
+            </form>
+        </div>
+    </div>
+    <div class="collapseArea">
+        <button type="button" class="collapsible" action="">Tune</button>
+        <div class="content">
+            <button class="adjustServoButton" onclick="adjustServo(-1)">-1</button>
+            <button class="adjustServoButton" onclick="adjustServo(1)">+1</button>
+            <form name="PID" onsubmit="pidTune(); return false">
+                <label>P</label>
+                <input type="text" name="p">
+                <label>I</label>
+                <input type="text" name="i">
+                <label>D</label>
+                <input type="text" name="d">
+                <input type="submit" value="submit">
+            </form>
+        </div>
+    </div>
+    <table cellspacing="0" class="driveButtons">
+        <tr>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 1023, Backward: 0, Turning: 90}})">🡼</td>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 1023, Backward: 0, Turning: 0}})">🡹</td>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 1023, Backward: 0, Turning: -90}})">🡽</td>
+        </tr>
+        <tr>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 0, Backward: 0, Turning: 90}})">🡸</td>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 0, Backward: 0, Turning: 0}})">⏸</td>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 0, Backward: 0, Turning: -90}})">🡺</td>
+        </tr>
+        <tr>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 0, Backward: 1023, Turning: 90}})">🡿</td>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 0, Backward: 1023, Turning: 0}})">🡻</td>
+            <td class="driveButton" onmousedown="send({Drive: {Forward: 0, Backward: 1023, Turning: -90}})">🡾</td>
+            <td></td>
+        </tr>
+    </table>
+    <input type="number" placeholder="speed (mm/s)" id="speed">
+    <pre id="lastMessage"></pre>
+    <pre id="DriverBotStatus"></pre>
+    <pre id="LogTopic"></pre>
+
+    <script src="main.js"></script>
+    <script src="controller.js"></script>
+    <script src="ControllerInput.js"></script>
+    <script src="KeyInput.js"></script>
+    <div id="input"></div>
+</body>
+
+</html>
