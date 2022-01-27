@@ -18,6 +18,10 @@
 #define WHEEL_DIAMETER 36.0 // unit in mm
 #define DIFFERENTIAL_RATIO 1.0 / 1.4
 
+// tickspeeds
+#define TICK_SPEED 200        // main tickseed
+#define STATUS_TICK_SPEED 100 // status post tickspeed
+
 StaticJsonDocument<1024> doc;
 StaticJsonDocument<1024> post;
 
@@ -26,12 +30,13 @@ unsigned long int LastMeasure;
 unsigned long int LastStatusUpdate;
 unsigned long int LastTick;
 
-long int P, I, D;
+long int P, I, D, Integral, PreviousError;
+long int LastDistance;
 
 int Turning, ServoOffset;
-int TargetSpeed;
+int Speed, TargetSpeed;
 
-long int Rotations = 0;
+long int Rotations;
 
 double Distance = 0;
 
@@ -66,16 +71,16 @@ void callback(char *topic, byte *payload, unsigned int length) {
   Serial.println("mqtt recieved");
   deserializeJson(doc, payload);
   serializeJsonPretty(doc, Serial);
-   if(doc["pid"]) {
+  if (doc["pid"]) {
     P = doc["pid"]["p"];
     I = doc["pid"]["i"];
     D = doc["pid"]["d"];
   }
-   if(doc["Servo"]) {
-     ServoOffset = doc["Servo"]["servoOffset"];
-   }
+  if (doc["Servo"]) {
+    ServoOffset = doc["Servo"]["servoOffset"];
+  }
 
-   if(doc["drive"]) {
+  if (doc["drive"]) {
     int Forward = doc["drive"]["Forward"];
     int Backward = doc["drive"]["Backward"];
     Turning = doc["drive"]["Turning"];
@@ -85,6 +90,8 @@ void callback(char *topic, byte *payload, unsigned int length) {
 }
 
 void setup() {
+
+
   Serial.begin(921600);
 
   pinMode(MOTOR_OUTPUT_PIN, OUTPUT);
@@ -140,29 +147,51 @@ void setup() {
   mqttClient.subscribe(mqttSubTopic);
 }
 
+int pid(int current, int target, int P, int I, int D) {
+  int error = target - current;
+  Integral += error * (TICK_SPEED / 1000.0);
+  int derivative = (error - PreviousError) / (TICK_SPEED / 1000.0);
+  long int tempOutput = (P * error + I * Integral + D * derivative);
+  int output = (tempOutput < 256) ? ((tempOutput > -256) ? tempOutput: -255): 255;
+
+  Serial.printf(
+      "current: %8i, target, %8i, output:  %8i, p: %8i, i: %8li, d: %8i\n",
+      current, target, output, error * P, Integral * I, derivative * D);
+
+  PreviousError = error;
+  return output;
+}
+
 void loop() {
   mqttClient.loop();
 
-  if ((millis() - LastTick) > 100) {
+  if ((millis() - LastTick) > TICK_SPEED) {
     LastTick = millis();
 
     Distance = ((double)Rotations * WHEEL_DIAMETER * 3.141 *
-                DIFFERENTIAL_RATIO * MOTOR_RATIO) * -1;
+                DIFFERENTIAL_RATIO * MOTOR_RATIO) *
+               -1;
 
-    if ((millis() - LastStatusUpdate) > 500) {
-      LastStatusUpdate = millis();
+    Speed = (Distance - LastDistance) / (TICK_SPEED / 1000.0);
+    LastDistance = Distance;
 
-      post["Distance"] = Distance;
-      char buffer[256];
-      serializeJson(post, buffer);
-      mqttClient.publish(mqttStatusTopic, buffer);
-    }
+    int output = pid(Speed, TargetSpeed, P, I, D);
 
-    digitalWrite(MOTOR_DIRECTION_PIN, 0 > TargetSpeed);
-    analogWrite(MOTOR_OUTPUT_PIN, abs(TargetSpeed));
+    analogWrite(MOTOR_OUTPUT_PIN, abs(output));
+    digitalWrite(MOTOR_DIRECTION_PIN, 0 > output);
+
     servo.write(Turning + 90 + ServoOffset);
 
     Serial.println(Distance);
     Serial.println(TargetSpeed);
+  }
+
+  if ((millis() - LastStatusUpdate) > STATUS_TICK_SPEED) {
+    LastStatusUpdate = millis();
+    post["Distance"] = Distance;
+    post["Speed"] = Speed;
+    char buffer[256];
+    serializeJson(post, buffer);
+    mqttClient.publish(mqttStatusTopic, buffer);
   }
 }

@@ -33,13 +33,12 @@ function onMessageArrived(message) {
     log("<span class='topic'>" + message.destinationName + "</span>: " + message.payloadString, message.destinationName)
     }
     else if (message.destinationName == "DriverBotStatus") {
-       document.getElementById("DriverBotStatus").innerHTML = syntaxHighlight(JSON.stringify(message.payloadString, undefined, 2)) 
+        document.getElementById("DriverBotStatus").innerHTML = syntaxHighlight(JSON.stringify(JSON.parse(message.payloadString), undefined, 2))
     }
 }
 
 function send(sendMessage) {
     let topic = document.forms["connectionForm"]["topic"].value
-
 
     message = new Paho.MQTT.Message(JSON.stringify(sendMessage));
     message.destinationName = topic;

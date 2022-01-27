@@ -30,6 +30,21 @@ input[type=submit]:hover {
     background-color: #45a049;
 }
 
+.adjustServoButton {
+    width: 10%;
+    background-color: #4CAF50;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.adjustServoButton:hover {
+    background-color: #45a049;
+}
+
 .collapseArea {
     width: 70%;
     margin-left: auto;
@@ -37,6 +52,7 @@ input[type=submit]:hover {
 }
 
 .collapsible {
+    border-radius: 4px;
     background-color: #777;
     color: white;
     cursor: pointer;
