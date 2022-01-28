@@ -14,12 +14,12 @@
 #define TACHO_PIN D7
 
 // constants
-#define MOTOR_RATIO 1 / 48
+#define MOTOR_RATIO 1.0 / 48.0
 #define WHEEL_DIAMETER 36.0 // unit in mm
 #define DIFFERENTIAL_RATIO 1.0 / 1.4
 
 // tickspeeds
-#define TICK_SPEED 200        // main tickseed
+#define TICK_SPEED 40        // main tickseed
 #define STATUS_TICK_SPEED 100 // status post tickspeed
 
 StaticJsonDocument<1024> doc;
@@ -31,7 +31,7 @@ unsigned long int LastStatusUpdate;
 unsigned long int LastTick;
 
 long int P, I, D, Integral, PreviousError;
-long int LastDistance;
+double LastDistance;
 
 int Turning, ServoOffset;
 int Speed, TargetSpeed;
