@@ -30,7 +30,7 @@ unsigned long int LastMeasure;
 unsigned long int LastStatusUpdate;
 unsigned long int LastTick;
 
-long int P, I, D, Integral, PreviousError;
+double P, I, D, Integral, PreviousError;
 double LastDistance;
 
 int Turning, ServoOffset;
@@ -147,15 +147,15 @@ void setup() {
   mqttClient.subscribe(mqttSubTopic);
 }
 
-int pid(int current, int target, int P, int I, int D) {
+int pid(int current, int target, double P, double I, double D) {
   int error = target - current;
   Integral += error * (TICK_SPEED / 1000.0);
-  int derivative = (error - PreviousError) / (TICK_SPEED / 1000.0);
+  double derivative = (error - PreviousError) / (TICK_SPEED / 1000.0);
   long int tempOutput = (P * error + I * Integral + D * derivative);
   int output = (tempOutput < 256) ? ((tempOutput > -256) ? tempOutput: -255): 255;
 
   Serial.printf(
-      "current: %8i, target, %8i, output:  %8i, p: %8i, i: %8li, d: %8i\n",
+      "current: %8i, target, %8i, output:  %8i, p: %8.2f, i: %8.2f, d: %8.2f\n",
       current, target, output, error * P, Integral * I, derivative * D);
 
   PreviousError = error;
